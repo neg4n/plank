@@ -16,6 +16,13 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //
+namespace ExperimentalBlur {
+    [DBus (name = "org.pantheon.gala")]
+    public interface IGala : Object { 
+        public abstract void disable_blur_behind (uint32 xid) throws Error;
+        public abstract void enable_blur_behind (uint32 xid, int x, int y, int width, int height, uint8 opacity) throws Error;
+    }
+}
 
 namespace Plank
 {
@@ -243,7 +250,7 @@ namespace Plank
 				return;
 			}
 			
-			unowned PositionManager position_manager = controller.position_manager;
+            unowned PositionManager position_manager = controller.position_manager;
 			
 			screen_is_composited = position_manager.screen_is_composited;
 			show_notifications = EnvironmentSettings.get_instance ().ShowNotifications;
@@ -416,7 +423,14 @@ namespace Plank
 			start2 = new DateTime.now_local ();
 #endif
 			// draw background-layer
-			draw_dock_background (main_cr, background_rect, x_offset, y_offset);
+            draw_dock_background (main_cr, background_rect, x_offset, y_offset);
+
+            var xwin = (Gdk.X11.Window)controller.window.get_window ();
+            uint32 id = (uint32)xwin.get_xid ();
+
+            var abc = position_manager.get_cursor_region ();
+            ExperimentalBlur.IGala? gala = Bus.get_proxy_sync (BusType.SESSION, "org.pantheon.gala", "/org/pantheon/gala");
+            gala.enable_blur_behind (id, abc.x, abc.y, abc.x + abc.width, abc.y + abc.height + 8, 255);
 #if BENCHMARK
 			end2 = new DateTime.now_local ();
 			benchmark.add ("background render time - %f ms".printf (end2.difference (start2) / 1000.0));
@@ -521,7 +535,7 @@ namespace Plank
 			
 			if (hide_progress > 0.0 && theme.CascadeHide) {
 				int x, y;
-				position_manager.get_background_padding (out x, out y);
+                position_manager.get_background_padding (out x, out y);
 				x_offset -= (int) (x * hide_progress);
 				y_offset -= (int) (y * hide_progress);
 			}
